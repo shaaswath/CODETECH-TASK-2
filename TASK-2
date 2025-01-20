@@ -1,0 +1,96 @@
+module MemoryController(
+    input wire clk,               // Clock signal
+    input wire rst,               // Reset signal
+    input wire [31:0] data_in,    // Data input for write operations
+    input wire [9:0] addr,        // Address for read/write operations
+    input wire wr_en,             // Write enable signal
+    input wire rd_en,             // Read enable signal
+    output reg [31:0] data_out,   // Data output for read operations
+    output reg ready              // Ready signal to indicate operation completion
+);
+    // State definitions
+    typedef enum {IDLE, WRITE, READ} state_t;
+    state_t current_state, next_state;
+
+    // Memory array (for simulation purposes)
+    reg [31:0] memory [0:1023];  // 1KB of memory
+
+    // State transition logic
+    always @(posedge clk or posedge rst) begin
+        if (rst)
+            current_state <= IDLE;
+        else
+            current_state <= next_state;
+    end
+
+    // Next state logic and output generation
+    always @(*) begin
+        case (current_state)
+            IDLE: begin
+                ready = 1;  // Indicate that the controller is ready for new commands
+                if (wr_en) begin
+                    next_state = WRITE;
+                    ready = 0;  // Not ready during write operation
+                end else if (rd_en) begin
+                    next_state = READ;
+                    ready = 0;  // Not ready during read operation
+                end else begin
+                    next_state = IDLE;
+                end
+            end
+
+            WRITE: begin
+                memory[addr] = data_in;  // Write data to memory at specified address
+                next_state = IDLE;        // Return to IDLE state after write operation
+            end
+
+            READ: begin
+                data_out = memory[addr];  // Read data from memory at specified address
+                next_state = IDLE;         // Return to IDLE state after read operation
+            end
+
+            default: next_state = IDLE; // Default case to avoid latches
+        endcase
+    end
+
+endmodule
+
+// Testbench for Memory Controller Module
+module testbench;
+    reg clk;
+    reg rst;
+    reg [31:0] data_in;
+    reg [9:0] addr;
+    reg wr_en;
+    reg rd_en;
+    wire [31:0] data_out;
+    wire ready;
+
+    MemoryController mem_ctrl (
+        .clk(clk),
+        .rst(rst),
+        .data_in(data_in),
+        .addr(addr),
+        .wr_en(wr_en),
+        .rd_en(rd_en),
+        .data_out(data_out),
+        .ready(ready)
+    );
+
+    initial begin
+        clk = 0; rst = 1; wr_en = 0; rd_en = 0; addr = 10'd0; data_in = 32'd0;
+
+        #5 rst = 0;  // Release reset
+
+        // Write operation example
+        addr = 10'd5; data_in = 32'd100; wr_en = 1; #10 wr_en = 0;
+
+        // Read operation example
+        addr = 10'd5; rd_en = 1; #10 rd_en = 0;
+
+        #10 $finish; // End simulation
+    end
+
+    always #5 clk = ~clk; // Clock generation
+
+endmodule
